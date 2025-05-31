@@ -1,0 +1,293 @@
+///////////////////////////
+void iprm_construct_GTMG(IPRMWorkspace* work){
+  // 统计GTMG的非零元素个数，并分配GTMG的内存
+  work->kkt->GTMG = qoco_malloc(sizeof(QOCOCscMatrix));
+  work->kkt->GTMG->m = work->data->n;
+  work->kkt->GTMG->n = work->data->n;
+  QOCOCscMatrix* G = work->data->G;
+  QOCOCscMatrix* GTMG = work->kkt->GTMG;
+  int nnz = 0;
+  for (int j = 0;j < work->data->n;j++){
+    for (int i = 0;i <= j;i++){
+      int ei = G->p[i], ej = G->p[j];
+      int nonzero = 0;
+      for (int t = 0;t < work->data->m;t++){
+        if (
+          ei < G->p[i + 1] && G->i[ei] == t &&
+          ej < G->p[j + 1] && G->i[ej] == t
+        ){
+          nonzero = 1;
+          break;
+        }
+        if (ei < G->p[i + 1] && G->i[ei] == t){
+          ei++;
+        }
+        if (ej < G->p[j + 1] && G->i[ej] == t){
+          ej++;
+        }
+      }
+      if (nonzero > 0){
+          nnz++;
+      }
+    }
+  }
+  GTMG->nnz = nnz;
+  GTMG->x = qoco_calloc(GTMG->nnz, sizeof(QOCOFloat));
+  GTMG->i = qoco_calloc(GTMG->nnz, sizeof(QOCOInt));
+  GTMG->p = qoco_calloc((GTMG->n + 1), sizeof(QOCOInt));
+  // 建立GTMG的稀疏结构
+  int e = 0;
+  for (int j = 0;j < work->data->n;j++){
+    GTMG->p[j] = e;
+    for (int i = 0;i <= j;i++){
+      int ei = G->p[i], ej = G->p[j];
+      int nonzero = 0;
+      for (int t = 0;t < work->data->m;t++){
+        if (
+          ei < G->p[i + 1] && G->i[ei] == t &&
+          ej < G->p[j + 1] && G->i[ej] == t
+        ){
+          nonzero = 1;
+          break;
+        }
+        if (ei < G->p[i + 1] && G->i[ei] == t){
+          ei++;
+        }
+        if (ej < G->p[j + 1] && G->i[ej] == t){
+          ej++;
+        }
+      }
+      if (nonzero > 0){
+        GTMG->i[e] = i;
+        e++;
+      }
+    }
+  }
+  GTMG->p[work->data->n] = e;
+  
+  // 记录G的乘积求和对
+  work->kkt->G_pairs_cnt = qoco_calloc(nnz, sizeof(QOCOInt));
+  work->kkt->G_pairs = qoco_calloc(nnz, sizeof(QOCOFloat*));
+  for (int j = 0;j < work->data->n;j++){
+    for (int e = G->p[j];e < G->p[j + 1];e++){
+      int i = G->i[e];
+      int cnt = 0; 
+      int ei = G->p[i], ej = G->p[j];
+      for (int t = 0;t < work->data->m;t++){
+        if (
+          ei < G->p[i + 1] && G->i[ei] == t &&
+          ej < G->p[j + 1] && G->i[ej] == t
+        ){
+          cnt++;
+        }
+        if (ei < G->p[i + 1] && G->i[ei] == t){
+          ei++;
+        }
+        if (ej < G->p[j + 1] && G->i[ej] == t){
+          ej++;
+        }
+      }
+      // 得到的cnt应是大于0的
+      work->kkt->G_pairs_cnt[e] = cnt;
+      work->kkt->G_pairs[e] = qoco_calloc(cnt, sizeof(QOCOFloat));
+      work->kkt->G_pairs_t[e] = qoco_calloc(cnt, sizeof(QOCOInt));
+      int c = 0;
+      for (int t = 0;t < work->data->m;t++){
+        if (
+          ei < G->p[i + 1] && G->i[ei] == t &&
+          ej < G->p[j + 1] && G->i[ej] == t
+        ){
+          work->kkt->G_pairs[e][c] = G->x[ei] * G->x[ej];
+          work->kkt->G_pairs_t[e][c] = t;
+          c++;
+        }
+        if (ei < G->p[i + 1] && G->i[ei] == t){
+          ei++;
+        }
+        if (ej < G->p[j + 1] && G->i[ej] == t){
+          ej++;
+        }
+      }
+    }
+  }
+  
+}
+void iprm_allocate_kkt2(IPRMWorkspace* work){
+  // 先分配GTMG的稀疏结构
+  work->kkt->GTMG = qoco_malloc(sizeof(QOCOCscMatrix));
+  work->kkt->GTMG->m = work->data->n;
+  work->kkt->GTMG->n = work->data->n;
+  work->kkt->GTMG->nnz = 0;
+  QOCOCscMatrix* G = work->data->G;
+  for (int j = 0;j < work->data->n;j++){
+    for (int i = 0;i <= j;i++){
+      int starti = G->p[i], endi = G->p[i + 1];
+      int startj = G->p[j], endj = G->p[j + 1];
+      int elei = starti, elej = startj;
+      //////////// 要做一些改进
+      /*
+      要把两个数都非零的pairs记录下来，它们的结果在GTMG中的位置也应该记录下来
+      
+      - 通过枚举可以找出所有的全非零数对的位置
+      - GTMG_{ij} = \sum_t (rho * y_t) ** 2 * G_{ti} * G_{tj}
+      对于每个t，可以把G_{ti} * G_{tj} 记录在一个稀疏矩阵中
+      但是这样没有办法让t的遍历也稀疏！！！
+      如果对枚举出来的每对不一定为0的(i, j)，
+      都存上所有非零的G_{ti} * G_{tj}数对
+      这样就能够维护足够稀疏的结构。
+      在allocate-construct中，要做的是：
+      - 统计出不一定为零的(i, j)的数量（GTMG->nnz）
+      - 对于不一定为零的(i, j)，保存稀疏向量G_{ti} * G_{tj}（包括所有使其非零的t）
+
+      */ 
+      for (int t = 0;t < work->data->m;t++){
+        if (elei < endi && G->i[elei] == t && elej < endj && G->i[elej] == t){
+          work->kkt->GTMG->nnz++;
+          break;
+        }
+        if (elei < endi && G->i[elei] == t){
+          elei++;
+        }
+        if (elej < endj && G->i[elej] == t){
+          elej++;
+        }
+      }
+    }
+  }
+  work->kkt->GTMG->x = qoco_calloc(work->kkt->GTMG->nnz, sizeof(QOCOFloat));
+  work->kkt->GTMG->i = qoco_calloc(work->kkt->GTMG->nnz, sizeof(QOCOInt));
+  work->kkt->GTMG->p = qoco_calloc((work->kkt->GTMG->n + 1), sizeof(QOCOInt));
+
+  /////////////////
+
+  work->kkt->K = qoco_malloc(sizeof(QOCOCscMatrix));
+  work->kkt->K->m = work->data->n + work->data->p;
+  work->kkt->K->n = work->data->n + work->data->p;
+  work->kkt->K->nnz = 0;
+  // 讨论P和G^TDG上三角的非零元素重叠后的数量
+  QOCOCscMatrix* P = work->data->P;
+  
+  for (int j = 0;j < work->data->n;j++){
+    int start = P->p[j], end = P->p[j + 1]; // P 在本列的元素的start和end索引
+    int ele = start; //当前活动的元素索引
+    for (int i = 0;i <= j;i++){
+      int nonzero = 0; // flag
+      if (ele < end && P->i[ele] == i){
+        nonzero++;
+        ele++;
+      }
+      // 枚举\sum_{t} coeff_{tij} {G_{ti} G_{tj}}，确认它是否一定为0
+      int starti = G->p[i], endi = G->p[i + 1];
+      int startj = G->p[j], endj = G->p[j + 1];
+      int elei = starti, elej = startj;
+      for (int t = 0;t < work->data->m;t++){
+
+        if (elei < endi && G->i[elei] == t && elej < endj && G->i[elej] == t){
+          nonzero++; // 只要找到一对同时非零，就说明这里的(i,j)元不一定为0
+          break;
+        }
+        if (elei < endi && G->i[elei] == t){
+          elei++;
+        }
+        if (elej < endj && G->i[elej] == t){
+          elej++;
+        }
+      }
+      // 
+      if (nonzero != 0){
+        work->kkt->K->nnz++;
+      }
+    }
+  }
+  work->kkt->K->nnz += (work->data->A->nnz + work->data->p); // 加上A^T块和静态正则化块的非零元计数
+  work->kkt->K->x = qoco_calloc(work->kkt->K->nnz, sizeof(QOCOFloat));
+  work->kkt->K->i = qoco_calloc(work->kkt->K->nnz, sizeof(QOCOInt));
+  work->kkt->K->p = qoco_calloc((work->kkt->K->n + 1), sizeof(QOCOInt));
+}
+
+void iprm_construct_kkt2(IPRMSolver* solver)
+{
+  IPRMWorkspace* work = solver->work;
+  QOCOCscMatrix* P = work->data->P;
+  QOCOCscMatrix* G = work->data->G;
+  QOCOCscMatrix* GTMG = work->kkt->GTMG;
+  // 先构造GTMG的稀疏结构
+  int nz = 0;
+  for (int j = 0;j < work->data->n;j++){
+    //GTMG->x, GTMG->p, GTMG->i
+    GTMG->p[j] = nz; // 无论这一列有无非零元，这样设一定是符合规则的
+    for (int i = 0;i <= j;i++){
+      int starti = G->p[i], endi = G->p[i + 1];
+      int startj = G->p[j], endj = G->p[j + 1];
+      int elei = starti, elej = startj;
+      for (int t = 0;t < work->data->m;t++){
+        if (elei < endi && G->i[elei] == t && elej < endj && G->i[elej] == t){
+          // 这个(i, j)元素是非零元，要做处理
+          GTMG->i[nz] = i;
+          // 这里先不填充G->x，只有在运行时才能确定
+          nz++;
+          break;
+        }
+        if (elei < endi && G->i[elei] == t){
+          elei++;
+        }
+        if (elej < endj && G->i[elej] == t){
+          elej++;
+        }
+      }
+    }
+  }
+  GTMG->p[work->data->n] = nz;
+
+  //构造K矩阵稀疏结构，并建立Preg与GTMG分别到K的映射
+  int kP = 0; // 当前关注的P的非零元素索引
+  int kGTMG = 0; // 当前关注的GTMG的非零元素索引
+  nz = 0;
+  for (int j = 0;j < work->data->n;j++){
+    work->kkt->K->p[j] = nz;
+    for (int i = 0;i <= j;i++){
+      int nonzero = 0;
+      if (kP < P->p[j + 1] && P->i[kP] == i){
+        work->kkt->PregtoKKT[kP] = nz;
+        nonzero++;
+        kP++;
+        
+      }
+      if (kGTMG < GTMG->p[j + 1] && GTMG->i[kGTMG] == i){
+        work->kkt->GTMGtoKKT[kGTMG] = nz;
+        nonzero++;
+        kGTMG++;
+      }
+      if (nonzero != 0){
+        work->kkt->K->i[nz] = i;
+        nz++;
+      }
+    }
+  }
+  work->kkt->K->p[work->data->n] = nz; // 
+  // 添加A^T块和静态正则化块
+  int col = work->data->n + 1; // 从此开始
+  for (QOCOInt Atcol = 0; Atcol < work->data->At->n; ++Atcol) {
+    QOCOInt nzadded = 0;
+    for (
+      QOCOInt k = work->data->At->p[Atcol]; 
+      k < work->data->At->p[Atcol + 1];++k) {
+      // If the nonzero is in row i of A then add
+      work->kkt->AtoKKT[k] = nz;
+      work->kkt->K->x[nz] = work->data->At->x[k];
+      work->kkt->K->i[nz] = work->data->At->i[k];
+      nz += 1;
+      nzadded += 1;
+    }
+
+    // Add -e * Id regularization.
+    work->kkt->K->x[nz] = -solver->settings->kkt_static_reg;
+    work->kkt->K->i[nz] = work->data->n + Atcol;
+    nz += 1;
+    nzadded += 1;
+    //下面这一句会遍历到col = work->data->n + work->data->At->n
+    //从而把所有的K->p都记好
+    work->kkt->K->p[col] = work->kkt->K->p[col - 1] + nzadded;
+    col += 1;
+  }
+}
