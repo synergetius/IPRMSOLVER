@@ -1,9 +1,14 @@
-function run_maros_iprm()
+function run_maros_debug()
+%%%%%%% 问题，使用的初始化是xi=-s，导致Z的初始值很高（||Z^2||_inf ~ 1e9），LDL分解中L矩阵中出现inf（说明可能有接近零的不良值）
+%%%%%%% 取reg=1e-6时发现可以避免inf （QPILOTNO,QFFFFF80）
+%%%%%%%% 发现问题：初始的z值的数量级差异可能较大（从1e-k到1ek都会有）。但是检验过发现改进初始化（让s-rho *
+%%%%%%%% xi接近0）并不能防止z值及其对应K矩阵的block的数量级更居中
     tests = dir(fullfile('maros/','*.mat'));
     results = table();
 
     st = {"QOCO_SOLVED","QOCO_SOLVED_INACCURATE", "QOCO_NUMERICAL_ERROR", "QOCO_MAX_ITER"};
-    test = "QETAMACR.mat";
+    test = "Q25FV47.mat";
+    %test = "QRECIPE.mat";
     [~, test_name, ~] = fileparts(test);
     test_name
     mm_data = load("maros/" + test);
@@ -12,11 +17,12 @@ function run_maros_iprm()
     solver = iprm;
     settings.verbose = 1;
     settings.max_iters = 200;
-    settings.iter_ref_iters = 1; %%%%%% iter-ref的次数和reg的大小都对求解精度有直接影响
-    reg = 1e-8; %%%%%%%%%% 
-    settings.kkt_static_reg = reg;
+    settings.gamma0 = 0.1;
+    reg = 1e-10;
+    settings.kkt_static_reg = reg; 
     settings.kkt_dynamic_reg = reg;
-    settings.epsilon = 1e-7;
+    % settings.epsilon = 1e-7;
+    % settings.iter_ref_iters = 1; 
     % settings.tau = 1e-2; % 影响线搜索的终止条件
     % settings.sigma = 0.01; % 影响rho的更新
     % settings.delta = 0.5; % 线搜索的倍率 %%%%%%%%%%%%%%%%%%%%%
@@ -28,7 +34,7 @@ function run_maros_iprm()
     row = {test_name,st{out.status},out.setup_time_sec,out.solve_time_sec,out.setup_time_sec + out.solve_time_sec, out.obj, out.phi, out.iters};
     results(1,:) = row;
     results.Properties.VariableNames = ["test","status","setup_time","solve_time","run_time","obj", "phi", "iters"];
-    writetable(results, "maros_results.csv");
+    %writetable(results, "maros_results.csv");
     %mm_data = load("maros/AUG2D.mat");
     
     % 考虑要记录哪些测试信息

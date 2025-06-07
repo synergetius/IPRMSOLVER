@@ -24,10 +24,7 @@ function run_iprm_lp()
         settings.verbose = 1;
         settings.max_iters = 200;
         settings.iter_ref_iters = 1;
-        reg = 1e-8;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%实验发现正则化直接决定收敛，并且理论上分析也可知数量级的问题。
-        settings.kkt_static_reg = reg;
-        settings.kkt_dynamic_reg = reg;
-        settings.epsilon = 1e-7;
+        settings.epsilon = 1e-12; %%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%settings.mu0 = 0.1; %%%%%%%%%%%%%%%%%
         solver.setup(n, m, p, P, c, A, b, G, h, settings);
         out = solver.solve();
