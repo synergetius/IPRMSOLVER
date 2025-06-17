@@ -1,0 +1,5 @@
+build/
+.vscode/
+hide/
+__pycache__/
+*_data.h

@@ -1,0 +1,233 @@
+#ifndef LINALG_H
+#define LINALG_H
+#include "definitions.h"
+#include "structs.h"
+
+/**
+ * @brief Allocates a new csc matrix and copies A to it.
+ *
+ * @param A Matrix to copy.
+ * @return Pointer to new constructed matrix.
+ */
+IPRMCscMatrix* new_iprm_csc_matrix(const IPRMCscMatrix* A);
+
+/**
+ * @brief Allocates a new csc matrix that is lambda * I.
+ *
+ * @param n Size of identity matrix.
+ * @param lambda Scaling factor for identity.
+ * @return Pointer to new constructed matrix.
+ */
+IPRMCscMatrix* construct_identity(IPRMInt n, IPRMFloat lambda);
+
+/**
+ * @brief Frees all the internal arrays and the pointer to the IPRMCscMatrix.
+ * Should only be used if IPRMCscMatrix and all internal arrays were malloc'ed.
+ *
+ * @param A Pointer to IPRMCscMatrix.
+ */
+void free_iprm_csc_matrix(IPRMCscMatrix* A);
+
+/**
+ * @brief Copies array of IPRMFloats from x to array y.
+ *
+ * @param x Source array.
+ * @param y Destination array.
+ * @param n Length of arrays.
+ */
+void copy_arrayf(const IPRMFloat* x, IPRMFloat* y, IPRMInt n);
+
+/**
+ * @brief Copies and negates array of IPRMFloats from x to array y.
+ *
+ * @param x Source array.
+ * @param y Destination array.
+ * @param n Length of arrays.
+ */
+void copy_and_negate_arrayf(const IPRMFloat* x, IPRMFloat* y, IPRMInt n);
+
+/**
+ * @brief Copies array of IPRMInts from x to array y.
+ *
+ * @param x Source array.
+ * @param y Destination array.
+ * @param n Length of arrays.
+ */
+void copy_arrayi(const IPRMInt* x, IPRMInt* y, IPRMInt n);
+
+/**
+ * @brief Computes dot product of u and v.
+ *
+ * @param u Input vector.
+ * @param v Input vector.
+ * @param n Length of vectors.
+ * @return Dot product of u and v.
+ */
+IPRMFloat dot(const IPRMFloat* u, const IPRMFloat* v, IPRMInt n);
+
+/**
+ * @brief Computes maximum element of array of IPRMInts.
+ *
+ * @param x Input array.
+ * @param n Length of array.
+ * @return Maximum element of x.
+ */
+IPRMInt max_arrayi(const IPRMInt* x, IPRMInt n);
+
+/**
+ * @brief Scales array x by s and stores result in y.
+ * y = s * x
+ *
+ * @param x Input array.
+ * @param y Output array.
+ * @param s Scaling factor.
+ * @param n Length of arrays.
+ */
+void scale_arrayf(const IPRMFloat* x, IPRMFloat* y, IPRMFloat s, IPRMInt n);
+
+/**
+ * @brief Computes z = a * x + y.
+ *
+ * @param x Input vector.
+ * @param y Input vector.
+ * @param z Result vector.
+ * @param a Scaling factor.
+ * @param n Length of vectors.
+ */
+void axpy(const IPRMFloat* x, const IPRMFloat* y, IPRMFloat* z, IPRMFloat a,
+          IPRMInt n);
+
+/**
+ * @brief Sparse matrix vector multiplication for CSC matrices where M is
+ * symmetric and only the upper triangular part is given. Computes r = M * v
+ *
+ * @param M Upper triangular part of M in CSC form.
+ * @param v Vector.
+ * @param r Result.
+ */
+void USpMv(const IPRMCscMatrix* M, const IPRMFloat* v, IPRMFloat* r);
+
+/**
+ * @brief Sparse matrix vector multiplication for CSC matrices. Computes r = M *
+ * v.
+ *
+ * @param M Matrix in CSC form.
+ * @param v Vector.
+ * @param r Result.
+ */
+void SpMv(const IPRMCscMatrix* M, const IPRMFloat* v, IPRMFloat* r);
+
+/**
+ * @brief Sparse matrix vector multiplication for CSC matrices where M is first
+ * transposed. Computes r = M^T * v.
+ *
+ * @param M Matrix in CSC form.
+ * @param v Vector.
+ * @param r Result.
+ */
+void SpMtv(const IPRMCscMatrix* M, const IPRMFloat* v, IPRMFloat* r);
+
+/**
+ * @brief Computes the infinity norm of x.
+ *
+ * @param x Input vector.
+ * @param n Length of input vector.
+ * @return Infinity norm of x.
+ */
+IPRMFloat inf_norm(const IPRMFloat* x, IPRMInt n);
+IPRMFloat norm_2(const IPRMFloat* x, IPRMInt n);
+/**
+ * @brief Adds lambda * I to a CSC matrix. Called on P prior to construction of
+ * KKT system in iprm_setup(). This function calls realloc() when adding new
+ * nonzeros.
+ *
+ * @param M Matrix to be regularized.
+ * @param lambda Regularization factor.
+ * @param nzadded_idx Indices of elements of M->x that are added.
+ * @return Number of nonzeros added to M->x.
+ */
+IPRMInt regularize(IPRMCscMatrix* M, IPRMFloat lambda, IPRMInt* nzadded_idx);
+
+/**
+ * @brief Subtracts lambda * I to a CSC matrix. Called on P when updating
+ * matrix data in update_matrix_data(). This function does not allocate and must
+ * be called after regularize.
+ *
+ * @param M Matrix.
+ * @param lambda Regularization.
+ */
+void unregularize(IPRMCscMatrix* M, IPRMFloat lambda);
+
+/**
+ * @brief Computes the infinity norm of each column (or equivalently row) of a
+ * symmetric sparse matrix M where only the upper triangular portion of M is
+ * given.
+ *
+ * @param M Upper triangular part of sparse symmetric matrix.
+ * @param norm Result vector of length n.
+ */
+void col_inf_norm_USymm(const IPRMCscMatrix* M, IPRMFloat* norm);
+
+/**
+ * @brief Computes the infinity norm of each row of M and stores in norm.
+ *
+ * @param M An m by n sparse matrix.
+ * @param norm Result vector of length m.
+ */
+void row_inf_norm(const IPRMCscMatrix* M, IPRMFloat* norm);
+
+/**
+ * @brief Allocates and computes A^T.
+ *
+ * @param A Input matrix.
+ */
+IPRMCscMatrix* create_transposed_matrix(const IPRMCscMatrix* A);
+
+/**
+ * @brief Scales the rows of M by E and columns of M by D.
+ * M = diag(E) * M * diag(S)
+ *
+ * @param M An m by n sparse matrix.
+ * @param E Vector of length m.
+ * @param D Vector of length m.
+ */
+void row_col_scale(const IPRMCscMatrix* M, IPRMFloat* E, IPRMFloat* D);
+
+/**
+ * @brief Computes elementwise product z = x .* y
+ *
+ * @param x Input array.
+ * @param y Input array.
+ * @param z Output array.
+ * @param n Length of arrays.
+ */
+void ew_product(IPRMFloat* x, const IPRMFloat* y, IPRMFloat* z, IPRMInt n);
+
+/**
+ * @brief Inverts permutation vector p and stores inverse in pinv.
+ *
+ * @param p Input permutation vector.
+ * @param pinv Inverse of permutation vector.
+ * @param n Length of vectors.
+ */
+void invert_permutation(const IPRMInt* p, IPRMInt* pinv, IPRMInt n);
+
+/**
+ * @brief Computes cumulative sum of c.
+ * @return Cumulative sum of c.
+ */
+IPRMInt cumsum(IPRMInt* p, IPRMInt* c, IPRMInt n);
+
+/**
+ * @brief C = A(p,p) = PAP' where A and C are symmetric and the upper triangular
+ * part is stored.
+ *
+ * @param A
+ * @param pinv
+ * @param AtoC
+ * @return IPRMCscMatrix*
+ */
+IPRMCscMatrix* csc_symperm(const IPRMCscMatrix* A, const IPRMInt* pinv,
+                           IPRMInt* AtoC);
+
+#endif /* #ifndef LINALG_H*/
