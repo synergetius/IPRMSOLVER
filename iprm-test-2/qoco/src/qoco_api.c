@@ -76,6 +76,8 @@ QOCOInt iprm_setup(IPRMSolver* solver, QOCOInt n, QOCOInt m, QOCOInt p,
       qoco_calloc(solver->work->data->G->nnz, sizeof(QOCOInt));
   solver->work->kkt->ZtoKKT = qoco_calloc(m, sizeof(QOCOInt));
   solver->work->kkt->psi = qoco_malloc((n + p + m + m) * sizeof(QOCOFloat));
+  solver->work->kkt->psi_buff = qoco_malloc((n + p + m + m) * sizeof(QOCOFloat));
+  solver->work->kkt->psi_buff2 = qoco_malloc((n + p + m + m) * sizeof(QOCOFloat));
   solver->work->kkt->rhs = qoco_malloc((n + p + m) * sizeof(QOCOFloat));
   solver->work->kkt->npm_buff = qoco_malloc((n + m + p) * sizeof(QOCOFloat));
   solver->work->kkt->npm_buff2 = qoco_malloc((n + m + p) * sizeof(QOCOFloat));
@@ -212,7 +214,7 @@ QOCOInt iprm_solve(IPRMSolver* solver)
     work->Dmu = -work->mu + work->gamma * work->kkt->phi;
     iprm_update_blocks(solver);
     iprm_construct_kkt_rhs(work);
-	printf("||rhs_s||_inf =  %.12e\n", inf_norm(&work->kkt->rhs[work->data->n + work->data->p], work->data->m));
+	//printf("||rhs_s||_inf =  %.12e\n", inf_norm(&work->kkt->rhs[work->data->n + work->data->p], work->data->m));
     iprm_kkt_solve(solver);
     // Dx, Dt, Ds 存储在work->kkt->xts中
     SpMv(work->data->G, work->kkt->xts, work->Dxi);
@@ -220,22 +222,22 @@ QOCOInt iprm_solve(IPRMSolver* solver)
       work->Dxi[j] = - work->Dxi[j] - 
         work->kkt->psi[work->data->n + work->data->p + work->data->m + j];
     }
-    printf("||Dxi||_inf = %.12e\n", inf_norm(work->Dxi, work->data->m));
-    printf("||Dx||_inf = %.12e\n", inf_norm(work->kkt->xts, work->data->n));
-    printf("||Dt||_inf = %.12e\n", 
-      inf_norm(&work->kkt->xts[work->data->n], work->data->p));
-    printf("||Ds||_inf = %.12e\n", 
-      inf_norm(&work->kkt->xts[work->data->n + work->data->p], work->data->m));
-    printf("mu = %.12e\n", work->mu);
-    printf("rho = %.12e\n", work->rho);
-    printf("Dmu = %.12e\n", work->Dmu);
+    // printf("||Dxi||_inf = %.12e\n", inf_norm(work->Dxi, work->data->m));
+    // printf("||Dx||_inf = %.12e\n", inf_norm(work->kkt->xts, work->data->n));
+    // printf("||Dt||_inf = %.12e\n", 
+      // inf_norm(&work->kkt->xts[work->data->n], work->data->p));
+    // printf("||Ds||_inf = %.12e\n", 
+      // inf_norm(&work->kkt->xts[work->data->n + work->data->p], work->data->m));
+    // printf("mu = %.12e\n", work->mu);
+    // printf("rho = %.12e\n", work->rho);
+    // printf("Dmu = %.12e\n", work->Dmu);
     /*
     for (int j = 0;j < work->data->m;j++){
       printf("%.12e ", qoco_sqrt(work->mu) / work->z[j]);
     }
     printf("\n");
     */
-    iprm_linesearch_update(solver); // 线搜索并更新步长
+    iprm_linesearch_update_fast(solver); // 线搜索并更新步长
     work->rho = qoco_max(
       work->rho, 
       solver->settings->sigma * 
@@ -278,6 +280,8 @@ QOCOInt iprm_cleanup(IPRMSolver* solver)
   qoco_free(solver->work->data);
   qoco_free(solver->work->kkt->rhs);
   qoco_free(solver->work->kkt->psi);
+  qoco_free(solver->work->kkt->psi_buff);
+  qoco_free(solver->work->kkt->psi_buff2);
   qoco_free(solver->work->kkt->xts);
   qoco_free(solver->work->kkt->npm_buff);
   qoco_free(solver->work->kkt->npm_buff2);

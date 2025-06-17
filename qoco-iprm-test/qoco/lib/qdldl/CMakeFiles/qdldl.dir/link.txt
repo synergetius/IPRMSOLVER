@@ -1,0 +1,3 @@
+"D:\Program Files\CMake\bin\cmake.exe" -E rm -f CMakeFiles\qdldl.dir/objects.a
+"D:\Program Files\mingw64\bin\ar.exe" qc CMakeFiles\qdldl.dir/objects.a @CMakeFiles\qdldl.dir\objects1.rsp
+"D:\Program Files\mingw64\bin\gcc.exe" -O3 -Wall -O3 -O3 -shared -o out\libqdldl.dll -Wl,--out-implib,out\libqdldl.dll.a -Wl,--major-image-version,0,--minor-image-version,0 -Wl,--whole-archive CMakeFiles\qdldl.dir/objects.a -Wl,--no-whole-archive @CMakeFiles\qdldl.dir\linkLibs.rsp

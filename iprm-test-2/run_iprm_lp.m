@@ -3,8 +3,10 @@ function run_iprm_lp()
     tests = dir(fullfile(lib_path,'*.mat'));
     results = table();
     st = {"QOCO_SOLVED","QOCO_SOLVED_INACCURATE", "QOCO_NUMERICAL_ERROR", "QOCO_MAX_ITER"};
-    % test.name = "lp_80bau3b.mat"
-    % tests = [test]
+    %test.name = "lp_grow15.mat" % reg = 1e-3可收，但不够精度
+    %test.name = "lp_grow22.mat"  % reg = 1e-3可收，但不够精度
+    %test.name = "lp_grow7.mat" % reg = 1e-4可收，但不够精度
+    %tests = [test]
     for k = 1:length(tests)
         test = tests(k).name;
         [~, test_name, ~] = fileparts(test);
@@ -24,8 +26,18 @@ function run_iprm_lp()
         settings.verbose = 1;
         settings.max_iters = 200;
         settings.iter_ref_iters = 1;
-        settings.epsilon = 1e-12; %%%%%%%%%%%%%%%%%%%%%%%%
-        %%%%%%%%%%settings.mu0 = 0.1; %%%%%%%%%%%%%%%%%
+
+        reg = 1e-8;%%%%%%%%%%%%%%%%%%%%%%%%%%%%%实验发现正则化直接决定收敛，并且理论上分析也可知数量级的问题。
+        settings.kkt_static_reg = reg;
+        settings.kkt_dynamic_reg = reg;
+        settings.epsilon = 1e-8;
+        settings.rho0 = 1e-3;
+        settings.delta = 0.5;
+        settings.sigma = 0.1;
+        settings.tau = 0.01;
+        settings.eta = 10;
+        settings.gamma0 = 0.001;
+
         solver.setup(n, m, p, P, c, A, b, G, h, settings);
         out = solver.solve();
         obj = out.obj * oscale

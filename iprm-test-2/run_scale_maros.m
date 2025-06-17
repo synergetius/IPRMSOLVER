@@ -10,24 +10,39 @@ function run_scale_maros()
         mm_data = load("maros/" + test);
         [n, m, p, P, c, A, b, G, h, oscale] = parse_maros(mm_data);
         solver = iprm;
-        settings.verbose = 1;
+        settings.verbose = 0;
         settings.max_iters = 200;
-        settings.iter_ref_iters = 1; %%%%%% iter-ref的次数和reg的大小都对求解精度有直接影响
-        reg = 1e-8; %%%%%%%%%% 
-        settings.kkt_static_reg = reg;
-        settings.kkt_dynamic_reg = reg;
-        settings.epsilon = 1e-7;
-        % settings.tau = 1e-2; % 影响线搜索的终止条件
-        % settings.sigma = 0.01; % 影响rho的更新
-        % settings.delta = 0.5; % 线搜索的倍率 %%%%%%%%%%%%%%%%%%%%%
-        % settings.gamma0 = 0.97; % 影响很明显
-        % settings.max_iters = 200; % 10000;
+        settings.iter_ref_iters = 1;
+        %%%%%
+        %settings.linesearch_iters = 10; %%%%%%%%%%%%%%%% 测试
+        %settings.delta = 0.4;
+
+        %settings.linesearch_iters = 7; %%%%%%%%%%%%%%%% 测试
+        %settings.delta = 0.3;
+        %%%%%%%
+        settings.epsilon = 1e-8;
+        % reg = 1e-8;
+        % settings.kkt_static_reg = reg;
+        % settings.kkt_dynamic_reg = reg;
+        % settings.epsilon = 1e-8;
+        % settings.rho0 = 1e-3;
+        % settings.delta = 0.5;
+        % settings.sigma = 0.01;
+        % settings.tau = 0.01;
+        % settings.mu0 = 0.1;
+        % settings.eta = 10;
+        % settings.gamma0 = 0.1;
+        %%%%%%%%
         solver.setup(n, m, p, P, c, A, b, G, h, settings);
         out = solver.solve();
         obj = out.obj * oscale;
         out.phi, obj
         row = {test_name,st{out.status},out.setup_time_sec,out.solve_time_sec,out.setup_time_sec + out.solve_time_sec, obj, out.phi, out.iters};
+        if out.status ~= 1
+            row{1, 5} = inf;
+        end
         results(k,:) = row;
+        
         results.Properties.VariableNames = ["test","status","setup_time","solve_time","run_time","obj", "phi", "iters"];
         writetable(results, "scale_maros_results.csv");
     end

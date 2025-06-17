@@ -6,20 +6,13 @@
 
 
 void iprm_compute_zy(IPRMWorkspace* work){
-	//printf("rho = %.12e, mu = %.12e\n", work->rho, work->mu);
-	QOCOFloat w = 0;
   for (QOCOInt j = 0;j < work->data->m;j++){
     QOCOFloat d = work->s[j] - work->rho * work->xi[j];
-	w = qoco_max(w, qoco_abs(d));
     QOCOFloat e = qoco_sqrt(d * d + 4 * work->rho * work->mu);
-    
+    // 整个过程中实际上都没有用到y的数值，不过算起来也不会太耗时
     work->y[j] = (e + d) / (2 * work->rho); 
 	work->z[j] = (e - d) / (2 * work->rho); 
-	// work->z[j] = work->mu / (work->rho * work->y[j]);
   }
-  //printf("d_max = %.12e\n", w);
-	//printf("||z||_inf = %.12e\n", inf_norm(work->z, work->data->m));
-	//printf("||y||_inf = %.12e\n", inf_norm(work->y, work->data->m));
 }
 void iprm_compute_psi_phi(IPRMSolver* solver)
 {
@@ -66,6 +59,7 @@ void iprm_compute_psi_phi(IPRMSolver* solver)
   
   //printf("finished psi phi\n");
 }
+
 void iprm_compute_obj(IPRMSolver* solver){
   IPRMWorkspace* work = solver->work;
   // Compute objective.
@@ -86,13 +80,15 @@ void iprm_compute_obj(IPRMSolver* solver){
 void iprm_eval_adjust(IPRMSolver* solver){
 
   IPRMWorkspace* work = solver->work;
+  IPRMProblemData* data = solver->work->data;
   iprm_compute_zy(work);
 
   iprm_compute_psi_phi(solver);
   while (work->mu > solver->settings->eta * work->kkt->phi && work->mu > solver->settings->epsilon){
     work->mu /= solver->settings->eta;
     iprm_compute_zy(work);
-    
+	// 这里的调整实际没什么影响（可能因为更新次数本来就很少）
+    //axpy(work->xi, work->z, &work->kkt->psi[data->n + data->p], -1.0, data->m); // mu的变化只影响z，可以局部更新
     iprm_compute_psi_phi(solver);
 	
   }
@@ -100,7 +96,117 @@ void iprm_eval_adjust(IPRMSolver* solver){
   work->gamma = qoco_min(solver->settings->gamma0, work->mu / work->kkt->phi);
   iprm_compute_obj(solver);
 }
+void iprm_linesearch_update_fast(IPRMSolver* solver){
+	IPRMWorkspace* work = solver->work;
+	IPRMProblemData* data = work->data;
+	IPRMKKT* kkt = work->kkt;
+	QOCOFloat* Dx = kkt->xts;
+	IPRMSettings* settings = solver->settings;
+	QOCOFloat* Dt = &kkt->xts[data->n];
+	QOCOFloat* Ds = &kkt->xts[data->n + data->p];
+	QOCOFloat* x0 = kkt->npm_buff;
+	QOCOFloat* t0 = &kkt->npm_buff[data->n];
+	QOCOFloat* s0 = &kkt->npm_buff[data->n + data->p];
+	QOCOFloat* xi0 = &kkt->npm_buff2[data->n + data->p]; /////////// 这里用到的npm_buff和npm_buff2有可能在嵌套的进程中被使用，从而造成冲突，计算错误，最好用专用的变量
+	QOCOFloat mu0 = work->mu;
+	for (int i = 0;i < data->n;i++){
+		x0[i] = work->x[i];
+	}
+	for (int i = 0;i < data->p;i++){
+		t0[i] = work->t[i];
+	}
+	for (int i = 0;i < data->m;i++){
+		s0[i] = work->s[i];
+	}
+	for (int i = 0;i < data->m;i++){
+		xi0[i] = work->xi[i];
+	}
+	
+	QOCOFloat phi0 = work->kkt->phi;
+	for (int i = 0;i < data->n + data->p + data->m + data->m;i++){
+		kkt->psi_buff[i] = kkt->psi[i];
+	}
+	// 预先计算增量
+	USpMv(data->P, Dx, work->kkt->psi_buff2);
+	for (int j = 0; j < data->n; ++j) {
+		work->kkt->psi_buff2[j] -= solver->settings->kkt_static_reg * Dx[j];
+		// 抵消P静态正则化的影响
+	}
+	if (data->p > 0){
+		SpMtv(data->A, Dt, work->xbuff); // A^t Dt
+		axpy(work->kkt->psi_buff2, work->xbuff, work->kkt->psi_buff2, 1.0, data->n); // 加到第一行
+		SpMv(data->A, Dx, &work->kkt->psi_buff2[data->n]); // Ax 加到第二行 
+	}
+	if (data->m > 0){
+		SpMtv(data->G, Ds, work->xbuff); //G^t Ds
+		axpy(work->kkt->psi_buff2, work->xbuff, work->kkt->psi_buff2, 1.0, data->n); // 加到第一行
+		SpMv(data->G, Dx, &work->kkt->psi_buff2[data->n + data->p + data->m]);  // 加到第四行
+		axpy(work->Dxi, &work->kkt->psi_buff2[data->n + data->p + data->m], 
+		  &work->kkt->psi_buff2[data->n + data->p + data->m], 1.0, data->m); // 加ξ到第四行
+	}
+	//
+	QOCOFloat a = 1.0;
+	for(QOCOInt i = 0;i < settings->linesearch_iters;i++){
+		work->mu = mu0 + a * work->Dmu;
+		for (int j = 0;j < work->data->n;j++){
+		  work->x[j] = x0[j] + a * Dx[j];
+		}
+		for (int j = 0;j < work->data->p;j++){
+		  work->t[j] = t0[j] + a * Dt[j];
+		}
+		for (int j = 0;j < work->data->m;j++){
+		  work->s[j] = s0[j] + a * Ds[j];
+		}
+		for (int j = 0;j < work->data->m;j++){
+		  work->xi[j] = xi0[j] + a * work->Dxi[j];
 
+		}
+		iprm_compute_zy(work); 
+		// 
+		axpy(work->kkt->psi_buff2, work->kkt->psi_buff, work->kkt->psi, a, data->n + data->p + data->m + data->m);
+		axpy(work->xi, work->z, &work->kkt->psi[data->n + data->p], -1.0, data->m);
+		work->kkt->phi = 0;
+		for (int j = 0;j < data->n + data->p + data->m + data->m;j++){
+			work->kkt->phi += work->kkt->psi[j] * work->kkt->psi[j]; 
+		}
+		work->kkt->phi /= 2;
+		//
+		if (work->kkt->phi <= (1 - 2 * settings->tau * a) * phi0){
+		  iprm_compute_obj(solver);
+		  return; // 达到更新标准
+		}
+
+		a *= settings->delta;
+
+	}
+	a = 1;
+	//printf("alpha = %lf\n", a);
+	//work->mu = mu0 + a * work->Dmu; // mu不更新，只更新其他的
+	for (int j = 0;j < work->data->n;j++){
+		work->x[j] = x0[j] + a * Dx[j];
+	}
+	for (int j = 0;j < work->data->p;j++){
+		work->t[j] = t0[j] + a * Dt[j];
+	}
+	for (int j = 0;j < work->data->m;j++){
+		work->s[j] = s0[j] + a * Ds[j];
+	}
+
+	for (int j = 0;j < work->data->m;j++){
+		work->xi[j] = xi0[j] + a * work->Dxi[j];
+	}
+	iprm_compute_zy(work);
+	// 
+	axpy(work->kkt->psi_buff2, work->kkt->psi_buff, work->kkt->psi, a, data->n + data->p + data->m + data->m);
+	axpy(work->xi, work->z, &work->kkt->psi[data->n + data->p], -1.0, data->m);
+	work->kkt->phi = 0;
+	for (int j = 0;j < data->n + data->p + data->m + data->m;j++){
+		work->kkt->phi += work->kkt->psi[j] * work->kkt->psi[j]; 
+	}
+	work->kkt->phi /= 2;
+	//
+	iprm_compute_obj(solver);
+}
 
 void iprm_linesearch_update(IPRMSolver* solver){
   // 线搜索的同时更新x, mu, t, s, xi
@@ -154,11 +260,12 @@ void iprm_linesearch_update(IPRMSolver* solver){
     }
 	iprm_compute_zy(work); ////////////// 注意此处！！
     iprm_compute_psi_phi(solver);
-	iprm_compute_obj(solver);
+	
 	
 	//printf("%.12e %.12e\n", work->kkt->phi, phi0);
     if (work->kkt->phi <= (1 - 2 * settings->tau * a) * phi0){
-	  printf("alpha = %lf\n", a);
+	  // printf("alpha = %lf\n", a);
+	  iprm_compute_obj(solver);
       return; // 达到更新标准
     }
 
@@ -170,7 +277,7 @@ void iprm_linesearch_update(IPRMSolver* solver){
   // 对比一下结果
   
   a = 1;
-  printf("alpha = %lf\n", a);
+  //printf("alpha = %lf\n", a);
   //work->mu = mu0 + a * work->Dmu; // mu不更新，只更新其他的
   for (int j = 0;j < work->data->n;j++){
     work->x[j] = x0[j] + a * Dx[j];

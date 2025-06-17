@@ -80,6 +80,8 @@ typedef struct{
   QOCOFloat* rhs;
   QOCOFloat* npm_buff; // buffer (length = n + p + m)
   QOCOFloat* npm_buff2;
+  QOCOFloat* psi_buff;
+  QOCOFloat* psi_buff2;
 } IPRMKKT;
 typedef struct{
   IPRMProblemData* data;

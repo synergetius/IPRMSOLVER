@@ -3,7 +3,7 @@ function run_scale_maros_debug()
     results = table();
 
     st = {"QOCO_SOLVED","QOCO_SOLVED_INACCURATE", "QOCO_NUMERICAL_ERROR", "QOCO_MAX_ITER"};
-    test = "AUG3DCQP.mat";
+    test = "POWELL20.mat";
     [~, test_name, ~] = fileparts(test);
     test_name
     mm_data = load("maros/" + test);
@@ -12,16 +12,20 @@ function run_scale_maros_debug()
     solver = iprm;
     settings.verbose = 1;
     settings.max_iters = 200;
-    settings.iter_ref_iters = 1; %%%%%% iter-ref的次数和reg的大小都对求解精度有直接影响
-    reg = 1e-8; %%%%%%%%%% 
-    settings.kkt_static_reg = reg;
-    settings.kkt_dynamic_reg = reg;
-    settings.epsilon = 1e-7;
-    % settings.tau = 1e-2; % 影响线搜索的终止条件
-    % settings.sigma = 0.01; % 影响rho的更新
-    % settings.delta = 0.5; % 线搜索的倍率 %%%%%%%%%%%%%%%%%%%%%
-    % settings.gamma0 = 0.97; % 影响很明显
-    % settings.max_iters = 200; % 10000;
+    settings.iter_ref_iters = 1;
+    %%%%%%%
+    % reg = 1e-8;
+    % settings.kkt_static_reg = reg;
+    % settings.kkt_dynamic_reg = reg;
+    % settings.epsilon = 1e-8;
+    % settings.rho0 = 1e-3;
+    % settings.delta = 0.5;
+    % settings.sigma = 0.01;
+    % settings.tau = 0.01;
+    % settings.mu0 = 0.1;
+    % settings.eta = 10;
+    % settings.gamma0 = 0.1;
+    %%%%%%%%
     solver.setup(n, m, p, P, c, A, b, G, h, settings);
     out = solver.solve();
     obj = out.obj * oscale;

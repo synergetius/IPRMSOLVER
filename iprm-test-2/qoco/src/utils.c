@@ -100,84 +100,90 @@ void iprm_print_footer(IPRMSolution* solution, enum qoco_solve_status status)
 }
 unsigned char iprm_check_stopping(IPRMSolver* solver)
 {
+	
 	IPRMWorkspace* work = solver->work;
 	IPRMProblemData* data = solver->work->data;
-	QOCOFloat eabs = solver->settings->epsilon;
-	QOCOFloat erel = solver->settings->epsilon;
-	QOCOFloat binf = data->p > 0 ? inf_norm(data->b, data->p) : 0;
-	QOCOFloat xiinf = data->m > 0 ? inf_norm(work->xi, data->m) : 0;
-	QOCOFloat sinf = data->m > 0 ? inf_norm(work->s, data->m) : 0;
-	QOCOFloat cinf = inf_norm(data->c, data->n);
-	QOCOFloat hinf = data->m > 0 ? inf_norm(data->h, data->m) : 0;
 	
-	SpMtv(data->A, work->t, work->xbuff);
-	QOCOFloat Attinf = data->p ? inf_norm(work->xbuff, data->n) : 0;
+	// QOCOFloat eabs = solver->settings->epsilon;
+	// QOCOFloat erel = solver->settings->epsilon;
+	// QOCOFloat binf = data->p > 0 ? inf_norm(data->b, data->p) : 0;
+	// QOCOFloat xiinf = data->m > 0 ? inf_norm(work->xi, data->m) : 0;
+	// QOCOFloat sinf = data->m > 0 ? inf_norm(work->s, data->m) : 0;
+	// QOCOFloat cinf = inf_norm(data->c, data->n);
+	// QOCOFloat hinf = data->m > 0 ? inf_norm(data->h, data->m) : 0;
 	
-	SpMtv(data->G, work->s, work->xbuff);
-	QOCOFloat Gtsinf = data->m > 0 ? inf_norm(work->xbuff, data->n) : 0;
+	// SpMtv(data->A, work->t, work->xbuff);
+	// QOCOFloat Attinf = data->p ? inf_norm(work->xbuff, data->n) : 0;
 	
-	USpMv(data->P, work->x, work->xbuff);
-	for (QOCOInt i = 0; i < data->n; ++i) {
-		work->xbuff[i] -= solver->settings->kkt_static_reg * work->x[i];
-	}
-	QOCOFloat Pxinf = inf_norm(work->xbuff, data->n);
-	QOCOFloat xPx = dot(work->x, work->xbuff, work->data->n);
+	// SpMtv(data->G, work->s, work->xbuff);
+	// QOCOFloat Gtsinf = data->m > 0 ? inf_norm(work->xbuff, data->n) : 0;
 	
-	SpMv(data->A, work->x, work->tbuff);
-	QOCOFloat Axinf = data->p ? inf_norm(work->tbuff, data->p) : 0;
+	// USpMv(data->P, work->x, work->xbuff);
+	// for (QOCOInt i = 0; i < data->n; ++i) {
+		// work->xbuff[i] -= solver->settings->kkt_static_reg * work->x[i];
+	// }
+	// QOCOFloat Pxinf = inf_norm(work->xbuff, data->n);
+	// QOCOFloat xPx = dot(work->x, work->xbuff, work->data->n);
+	
+	// SpMv(data->A, work->x, work->tbuff);
+	// QOCOFloat Axinf = data->p ? inf_norm(work->tbuff, data->p) : 0;
 
-	SpMv(data->G, work->x, work->ubuff1);
-  QOCOFloat Gxinf = data->m ? inf_norm(work->ubuff1, data->m) : 0;
-  // Compute primal residual.
-  QOCOFloat eq_res = inf_norm(&work->kkt->psi[data->n], data->p);
-  QOCOFloat ineq_res = inf_norm(&work->kkt->psi[data->n + data->p + data->m], data->m);
-  QOCOFloat pres = qoco_max(eq_res, ineq_res);
-  solver->sol->pres = pres;
-  // Compute dual residual.
-  QOCOFloat dres = inf_norm(work->kkt->psi, data->n);
-  solver->sol->dres = dres;
-  // Compute gap: || z - xi ||_\infty
-  // 无论用哪种都存在问题：gap 达不到足够小（1e-5 vs 1e-7）
-  //QOCOFloat gap = norm_2(&work->kkt->psi[data->n + data->p], data->m); //////// ??
-  QOCOFloat gap = inf_norm(&work->kkt->psi[data->n + data->p], data->m);
-  solver->sol->gap = gap;
-  // Compute max{Axinf, binf, Gxinf, hinf, xiinf}.
-  QOCOFloat pres_rel = qoco_max(Axinf, binf);
-  pres_rel = qoco_max(pres_rel, Gxinf);
-  pres_rel = qoco_max(pres_rel, hinf);
-  pres_rel = qoco_max(pres_rel, xiinf);
-  // Compute max{Pxinf, Attinf, Gtsinf, cinf}.
-  QOCOFloat dres_rel = qoco_max(Pxinf, Attinf);
-  dres_rel = qoco_max(dres_rel, Gtsinf);
-  dres_rel = qoco_max(dres_rel, cinf);
-  // Compute max{1, abs(pobj), abs(dobj)}.
-  QOCOFloat ctx = dot(work->data->c, work->x, work->data->n);
-  QOCOFloat btt = dot(work->data->b, work->t, work->data->p);
-  QOCOFloat hts = dot(work->data->h, work->s, work->data->m);
-  QOCOFloat pobj = 0.5 * xPx + ctx;
-  QOCOFloat dobj = -0.5 * xPx - btt - hts;
-  pobj = qoco_abs(pobj);
-  dobj = qoco_abs(dobj);
-  QOCOFloat gap_rel = qoco_max(1, pobj);
-  gap_rel = qoco_max(gap_rel, dobj);
+	// SpMv(data->G, work->x, work->ubuff1);
+  // QOCOFloat Gxinf = data->m ? inf_norm(work->ubuff1, data->m) : 0;
+  // // Compute primal residual.
+  // QOCOFloat eq_res = inf_norm(&work->kkt->psi[data->n], data->p);
+  // QOCOFloat ineq_res = inf_norm(&work->kkt->psi[data->n + data->p + data->m], data->m);
+  // QOCOFloat pres = qoco_max(eq_res, ineq_res);
+  // solver->sol->pres = pres;
+  // // Compute dual residual.
+  // QOCOFloat dres = inf_norm(work->kkt->psi, data->n);
+  // solver->sol->dres = dres;
+  // // Compute gap: || z - xi ||_\infty
+  // QOCOFloat gap = norm_2(&work->kkt->psi[data->n + data->p], data->m); //////// ??
+  // //QOCOFloat gap = inf_norm(&work->kkt->psi[data->n + data->p], data->m);
+  // solver->sol->gap = gap;
+  // // Compute max{Axinf, binf, Gxinf, hinf, xiinf}.
+  // QOCOFloat pres_rel = qoco_max(Axinf, binf);
+  // pres_rel = qoco_max(pres_rel, Gxinf);
+  // pres_rel = qoco_max(pres_rel, hinf);
+  // pres_rel = qoco_max(pres_rel, xiinf);
+  // // Compute max{Pxinf, Attinf, Gtsinf, cinf}.
+  // QOCOFloat dres_rel = qoco_max(Pxinf, Attinf);
+  // dres_rel = qoco_max(dres_rel, Gtsinf);
+  // dres_rel = qoco_max(dres_rel, cinf);
+  // // Compute max{1, abs(pobj), abs(dobj)}.
+  // QOCOFloat ctx = dot(work->data->c, work->x, work->data->n);
+  // QOCOFloat btt = dot(work->data->b, work->t, work->data->p);
+  // QOCOFloat hts = dot(work->data->h, work->s, work->data->m);
+  // QOCOFloat pobj = 0.5 * xPx + ctx;
+  // QOCOFloat dobj = -0.5 * xPx - btt - hts;
+  // pobj = qoco_abs(pobj);
+  // dobj = qoco_abs(dobj);
+  // QOCOFloat gap_rel = qoco_max(1, pobj);
+  // gap_rel = qoco_max(gap_rel, dobj);
+  
+  
   //printf("pres: %.12e, eabs + erel * pres_rel:%.12e\n", pres, eabs + erel * pres_rel);
   //printf("dres: %.12e, eabs + erel * dres_rel:%.12e\n", dres, eabs + erel * dres_rel);
   //printf("solver->sol->gap:%.12e, eabs + erel * gap_rel:%.12e\n", solver->sol->gap, eabs + erel * gap_rel);
-  printf("target pres:%+.5e dres:%+.5e gap:%+.5e\n", eabs + erel * pres_rel, eabs + erel * dres_rel, eabs + erel * gap_rel);
-  /*
+  
+  //printf("target pres:%+.5e dres:%+.5e gap:%+.5e\n", eabs + erel * pres_rel, eabs + erel * dres_rel, eabs + erel * gap_rel);
+  
+  // IPRM论文中的终止条件
+  
   if (solver->work->mu < solver->settings->epsilon && work->kkt->phi < solver->settings->epsilon){
 	solver->sol->status = QOCO_SOLVED;
 	return 1;
   }
-  */
-  
-  if (pres < eabs + erel * pres_rel && dres < eabs + erel * dres_rel &&
-      solver->sol->gap < eabs + erel * gap_rel) {
-    solver->sol->status = QOCO_SOLVED;
-    printf("%+.5e %+.5e\n", solver->sol->gap, eabs + erel * gap_rel);
-    printf("check solved\n");
-    return 1;
-  }
+ 
+  // QOCO论文中的终止条件
+  // if (pres < eabs + erel * pres_rel && dres < eabs + erel * dres_rel &&
+      // solver->sol->gap < eabs + erel * gap_rel) {
+    // solver->sol->status = QOCO_SOLVED;
+    // printf("%+.5e %+.5e\n", solver->sol->gap, eabs + erel * gap_rel);
+    // printf("check solved\n");
+    // return 1;
+  // }
   return 0;
 }
 void iprm_copy_solution(IPRMSolver* solver)

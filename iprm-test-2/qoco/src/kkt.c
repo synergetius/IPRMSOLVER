@@ -146,10 +146,7 @@ void iprm_initialize(IPRMSolver* solver){
   
   work->mu = solver->settings->mu0;
   work->rho = solver->settings->rho0;
-  // 尝试让z, y数量级更居中的初始化方法
-  //for (int i = 0;i < work->data->m;i++){
-  //  work->xi[i] = work->s[i] / work->rho; // s - rho * xi ~ 0
-  //}
+
   SpMv(work->data->G, work->x, work->xi);
   axpy(work->xi, work->data->h, work->xi, -1, work->data->m);
   
@@ -173,16 +170,16 @@ void iprm_initialize(IPRMSolver* solver){
 void iprm_update_blocks(IPRMSolver* solver){
   // Block (1, 3)
   IPRMWorkspace* work = solver->work;
-  for (QOCOInt i = 0; i < work->data->Gt->nnz; ++i) {
-    work->kkt->K->x[work->kkt->GtoKKT[i]] = work->data->Gt->x[i];
-  }
-  QOCOFloat w = 0, u = 1e300;
+  // for (QOCOInt i = 0; i < work->data->Gt->nnz; ++i) {
+    // work->kkt->K->x[work->kkt->GtoKKT[i]] = work->data->Gt->x[i];
+  // }
+  // QOCOFloat w = 0, u = 1e300;
   for (QOCOInt j = 0; j < work->data->m;j++){
     work->kkt->K->x[work->kkt->ZtoKKT[j]] = -work->z[j] * work->z[j] / work->mu - solver->settings->kkt_static_reg;
-	w = qoco_max(w, qoco_abs(work->kkt->K->x[work->kkt->ZtoKKT[j]]));
-	u = qoco_min(u, qoco_abs(work->kkt->K->x[work->kkt->ZtoKKT[j]]));
+	// w = qoco_max(w, qoco_abs(work->kkt->K->x[work->kkt->ZtoKKT[j]]));
+	// u = qoco_min(u, qoco_abs(work->kkt->K->x[work->kkt->ZtoKKT[j]]));
   }
-  printf("ZBlockRange: %.12e - %.12e\n", u, w);
+  // printf("ZBlockRange: %.12e - %.12e\n", u, w);
 }
 void iprm_construct_kkt_rhs(IPRMWorkspace* work)
 {
@@ -191,10 +188,6 @@ void iprm_construct_kkt_rhs(IPRMWorkspace* work)
     work->kkt->rhs[work->data->n + work->data->p + i] = -(
 		work->kkt->psi[work->data->n + work->data->p + i] 
 		+ work->rho * work->z[i] * work->z[i] * work->kkt->psi[work->data->n + work->data->p + i] / work->mu
-	/*
-        (work->z[i] + work->y[i]) 
-            * work->kkt->psi[work->data->n + work->data->p + i]
-            / work->y[i] */
         + work->Dmu * work->z[i] / work->mu
         + work->kkt->psi[work->data->n + work->data->p + work->data->m + i]
     );
@@ -211,7 +204,7 @@ void iprm_kkt_solve(IPRMSolver* solver){
                work->kkt->bwork, work->kkt->iwork, work->kkt->fwork,
                solver->work->kkt->p, solver->work->data->n,
                solver->settings->kkt_dynamic_reg);
-	printf("||L||_inf = %.12e\n", inf_norm(work->kkt->Lx, work->kkt->Lp[work->kkt->K->n]));
+	// printf("||L||_inf = %.12e\n", inf_norm(work->kkt->Lx, work->kkt->Lp[work->kkt->K->n]));
   IPRMKKT* kkt = solver->work->kkt;
 
   // Permute and store rhs

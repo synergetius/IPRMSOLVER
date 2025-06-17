@@ -1,0 +1,20 @@
+[
+{
+  "directory": "D:/programming/qoco-iprm-matlab/qoco/lib/qdldl",
+  "command": "\"D:\\Program Files\\mingw64\\bin\\gcc.exe\" -DBUILDING_QDLDL -DIS_WINDOWS -DQDLDL_SHARED_LIB -Dqdldl_EXPORTS @CMakeFiles/qdldl.dir/includes_C.rsp -O3 -Wall -O3 -O3 -o CMakeFiles\\qdldl.dir\\src\\qdldl.c.obj -c D:\\programming\\qoco-iprm-matlab\\qoco\\lib\\qdldl\\src\\qdldl.c",
+  "file": "D:/programming/qoco-iprm-matlab/qoco/lib/qdldl/src/qdldl.c",
+  "output": "lib/qdldl/CMakeFiles/qdldl.dir/src/qdldl.c.obj"
+},
+{
+  "directory": "D:/programming/qoco-iprm-matlab/qoco/lib/qdldl",
+  "command": "\"D:\\Program Files\\mingw64\\bin\\gcc.exe\" -DIS_WINDOWS @CMakeFiles/qdldlstatic.dir/includes_C.rsp -O3 -Wall -O3 -O3 -o CMakeFiles\\qdldlstatic.dir\\src\\qdldl.c.obj -c D:\\programming\\qoco-iprm-matlab\\qoco\\lib\\qdldl\\src\\qdldl.c",
+  "file": "D:/programming/qoco-iprm-matlab/qoco/lib/qdldl/src/qdldl.c",
+  "output": "lib/qdldl/CMakeFiles/qdldlstatic.dir/src/qdldl.c.obj"
+},
+{
+  "directory": "D:/programming/qoco-iprm-matlab/qoco/lib/qdldl",
+  "command": "\"D:\\Program Files\\mingw64\\bin\\gcc.exe\" -DIS_WINDOWS @CMakeFiles/qdldlobject.dir/includes_C.rsp -O3 -Wall -O3 -O3 -o CMakeFiles\\qdldlobject.dir\\src\\qdldl.c.obj -c D:\\programming\\qoco-iprm-matlab\\qoco\\lib\\qdldl\\src\\qdldl.c",
+  "file": "D:/programming/qoco-iprm-matlab/qoco/lib/qdldl/src/qdldl.c",
+  "output": "lib/qdldl/CMakeFiles/qdldlobject.dir/src/qdldl.c.obj"
+}
+]
