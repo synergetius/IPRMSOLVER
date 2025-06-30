@@ -1,0 +1,2 @@
+"D:\Program Files\mingw64\bin\ar.exe" qc out\libqdldl.a CMakeFiles/qdldlstatic.dir/src/qdldl.c.obj
+"D:\Program Files\mingw64\bin\ranlib.exe" out\libqdldl.a
